@@ -1,0 +1,104 @@
+@model List<ClinicaMvc.Models.Procedimento>
+@{
+    ViewData["Title"] = "ClínicaFácil — Painel Operacional MVC";
+    var clientes = ViewBag.Clientes as List<ClinicaMvc.Models.Cliente> ?? new();
+}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 p-6">
+    <div class="max-w-6xl mx-auto space-y-8">
+        <header class="flex items-center justify-between border-b pb-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">ClínicaFácil — ASP.NET Core MVC + SQLite</h1>
+                <p class="text-sm text-slate-500">Persistência ativa em clinica.db (@Model.Count atendimentos registrados)</p>
+            </div>
+        </header>
+
+        <!-- 1, 2 e 3: Cadastro de Cliente + Registro de Procedimento com Foto -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form method="post" action="/Clinica/CriarCliente" class="bg-white p-5 rounded-xl border space-y-3 shadow-sm">
+                <h2 class="font-bold text-slate-900">1. Novo Cliente</h2>
+                <input name="Nome" placeholder="Nome completo" required class="w-full border rounded-lg px-3 py-2 text-sm" />
+                <input name="Telefone" placeholder="Telefone / WhatsApp" required class="w-full border rounded-lg px-3 py-2 text-sm" />
+                <input name="Cpf" placeholder="CPF" class="w-full border rounded-lg px-3 py-2 text-sm" />
+                <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded-lg text-sm font-semibold">Salvar Cliente no SQLite</button>
+            </form>
+
+            <form method="post" action="/Clinica/RegistrarProcedimento" enctype="multipart/form-data" class="bg-white p-5 rounded-xl border space-y-3 shadow-sm">
+                <h2 class="font-bold text-slate-900">2 & 3. Registrar Procedimento + Foto + Retorno</h2>
+                <select name="ClienteId" required class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="">Selecione o Paciente...</option>
+                    @foreach (var c in clientes) {
+                        <option value="@c.Id">@c.Nome (@c.Telefone)</option>
+                    }
+                </select>
+                <input name="Tipo" placeholder="Procedimento (ex: Clareamento, Limpeza)" required class="w-full border rounded-lg px-3 py-2 text-sm" />
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="date" name="DataProcedimento" required class="border rounded-lg px-3 py-2 text-sm" />
+                    <input type="date" name="DataRetorno" required class="border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <textarea name="Observacoes" placeholder="Evolução clínica..." required class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                <input type="file" name="foto" accept="image/*" class="w-full text-xs" />
+                <button type="submit" class="w-full bg-teal-600 text-white py-2 rounded-lg text-sm font-semibold">Registrar Atendimento</button>
+            </form>
+        </div>
+
+        <!-- 5: Painel de Retornos -->
+        <section class="bg-white p-5 rounded-xl border shadow-sm space-y-3">
+            <h2 class="font-bold text-slate-900">5. Painel de Controle de Retornos</h2>
+            <table class="w-full text-sm text-left border-collapse">
+                <thead>
+                    <tr class="border-b text-slate-500">
+                        <th class="py-2">Paciente</th>
+                        <th>Procedimento</th>
+                        <th>Data Retorno</th>
+                        <th>Status</th>
+                        <th class="text-right">Ação</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    @foreach (var p in Model) {
+                        <tr>
+                            <td class="py-2.5 font-medium">@p.Cliente?.Nome <span class="text-xs text-slate-400">(@p.Cliente?.Telefone)</span></td>
+                            <td>@p.Tipo</td>
+                            <td>@p.DataRetorno</td>
+                            <td>@(p.RetornoConcluido ? "✅ Concluído" : "⏳ Pendente")</td>
+                            <td class="text-right">
+                                <form method="post" action="/Clinica/AlternarRetorno" class="inline">
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <button class="px-3 py-1 rounded bg-slate-900 text-white text-xs">Alternar Status</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <!-- 4: Histórico Clínico e Galeria de Fotos -->
+        <section class="space-y-3">
+            <h2 class="font-bold text-slate-900">4. Histórico Clínico e Prontuário Fotográfico</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @foreach (var p in Model) {
+                    <div class="bg-white p-4 rounded-xl border shadow-sm flex gap-4">
+                        @if (!string.IsNullOrEmpty(p.FotoBase64)) {
+                            <img src="@p.FotoBase64" alt="Foto clínica" class="w-28 h-28 object-cover rounded-lg border" />
+                        }
+                        <div class="space-y-1 text-sm">
+                            <div class="font-bold text-slate-900">@p.Tipo</div>
+                            <div class="text-xs text-slate-500">Paciente: @p.Cliente?.Nome | Realizado em: @p.DataProcedimento</div>
+                            <p class="text-slate-600 text-xs mt-1">@p.Observacoes</p>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</body>
+</html>

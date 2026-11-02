@@ -1,0 +1,213 @@
+================================================================================
+CLINICAFACIL - BREAKDOWN ARQUITETURAL POR COMPONENTE (FLUXO M -> V -> C)
+Stack: C# (.NET 8) | ASP.NET Core MVC | Entity Framework Core | SQLite | Colab
+================================================================================
+
+1. VISAO GERAL DO FLUXO M -> V -> C NA APLICACAO
+--------------------------------------------------------------------------------
+O sistema ClinicaFacil foi projetado com arquitetura enxuta para demonstracao
+direta em apresentacao (Google Colab + SQLite). A direcao M -> V -> C descreve
+como os dados estruturados e persistidos no banco alimentam a interface visual e
+como as interacoes do usuario acionam o controlador para fechar o ciclo:
+
+  [M] MODEL (Dados e Persistencia SQLite)
+       |  Fornece as entidades estruturadas (Cliente, Procedimento) e o estado
+       |  persistido no arquivo fisico clinica.db (incluindo fotos em Base64).
+       v
+  [V] VIEW (Interface Operacional / Razor View / Painel Interativo)
+       |  Renderiza os dados do Model em 4 abas operacionais (Recepcao,
+       |  Historico, Retornos e Auditoria) e captura acoes via formularios POST.
+       v
+  [C] CONTROLLER (Orquestracao de Rotas e Regras de Negocio)
+       |  Recebe os formularios e cliques da View, processa uploads (IFormFile
+       |  para Base64), aplica mudancas no AppDbContext, executa SaveChanges()
+       |  no Model e atualiza a View via RedirectToAction("Index").
+
+
+================================================================================
+2. COMPONENTE [M] - MODEL (CAMADA DE DADOS E PERSISTENCIA SQLITE)
+================================================================================
+Arquivo de Referencia: Models/AppDbContext.cs
+Banco de Dados Fisico: clinica.db (SQLite local criado via EnsureCreated)
+
+2.1. Entidade: Cliente
+  Representa o paciente cadastrado na recepcao da clinica.
+  - Id (int, PK, Auto-Increment): Identificador unico do paciente.
+  - Nome (string, obrigatorio): Nome completo do paciente.
+  - Telefone (string, obrigatorio): Numero de contato / WhatsApp para aviso de
+    retorno.
+  - Cpf (string, opcional): Documento de identificacao no prontuario.
+  - CriadoEm (string / ISO Date): Data de registro inicial na clinica.
+
+2.2. Entidade: Procedimento
+  Representa cada atendimento clinico realizado, vinculando o paciente, o anexo
+  fotografico e o agendamento de retorno em um unico registro coeso.
+  - Id (int, PK, Auto-Increment): Identificador unico do atendimento.
+  - ClienteId (int, FK): Chave estrangeira que referencia Cliente.Id.
+  - Cliente (Cliente?, Navigation Property): Propriedade de navegacao do EF Core
+    para carregar os dados do paciente via .Include(p => p.Cliente).
+  - Tipo (string): Categoria do procedimento realizado (ex: Limpeza e Profilaxia,
+    Clareamento a Laser, Aplicacao de Toxina Botulinica, Pos-Operatorio).
+  - DataProcedimento (string, YYYY-MM-DD): Data em que o atendimento ocorreu.
+  - DataRetorno (string, YYYY-MM-DD): Data programada para a volta do paciente.
+  - Observacoes (string): Evolucao clinica e anotacoes do profissional.
+  - FotoBase64 (string): Imagem clinica (antes/depois ou exame) convertida em
+    Data URI Base64 e gravada diretamente na coluna TEXT do SQLite, eliminando
+    dependencia de servidores externos de arquivos durante a apresentacao.
+  - RetornoConcluido (bool): Flag que indica se o paciente ja compareceu ao
+    retorno agendado (false = Pendente/Atrasado; true = Compareceu/Concluido).
+
+2.3. Contexto de Banco de Dados: AppDbContext (herda de DbContext)
+  Gerencia a comunicacao entre as classes C# e o banco relacional SQLite.
+  - DbSet&lt;Cliente&gt; Clientes: Mapeia a tabela fisica "Clientes".
+  - DbSet&lt;Procedimento&gt; Procedimentos: Mapeia a tabela fisica "Procedimentos".
+  - OnConfiguring(): Configura a string de conexao "Data Source=clinica.db".
+  - Inicializacao no Program.cs: Chama db.Database.EnsureCreated() na subida da
+    aplicacao para criar automaticamente o arquivo clinica.db e suas tabelas sem
+    necessidade de rodar comandos manuais de Migrations no Google Colab.
+
+
+================================================================================
+3. COMPONENTE [V] - VIEW (CAMADA DE APRESENTACAO E INTERFACE DO USUARIO)
+================================================================================
+Arquivo de Referencia: Views/Clinica/Index.cshtml (Workspace Operacional)
+Bindings Recebidos do Model:
+  - @model List<ClinicaMvc.Models.Procedimento> (Lista completa de atendimentos)
+  - ViewBag.Clientes (Lista de pacientes ativos para popular os &lt;select&gt;)
+
+3.1. Topo e Indicadores Globais (Header & Hero)
+  - Exibe contadores em tempo real derivados do Model: Total de Atendimentos
+    no banco, Pacientes Ativos, Procedimentos Realizados e Fotos Clinicas.
+
+3.2. Aba 1: Recepcao & Atendimento (#tab-cadastro)
+  - Coluna Esquerda (Formulario de Criacao de Cliente):
+      * Campos: Nome Completo, Telefone/WhatsApp e CPF.
+      * Submissao: Envia POST para /Clinica/CriarCliente.
+      * Mini Lista de Pacientes: Renderiza ViewBag.Clientes com ID, nome,
+        telefone e selo de status "Ativo".
+  - Coluna Direita (Formulario de Registro de Procedimento + Upload de Foto):
+      * Campos: Select de Paciente (povoado por ViewBag.Clientes), Select de
+        Tipo de Procedimento, Data do Atendimento, Data Prevista para Retorno e
+        Textarea de Observacoes Clinicas.
+      * Area de Anexo Fotografico: Input de arquivo (type="file", accept="image/*")
+        com pre-visualizacao instantanea da miniatura e botao auxiliar para
+        gerar imagem clinica de demonstracao.
+      * Submissao: Envia POST (multipart/form-data) para
+        /Clinica/RegistrarProcedimento.
+
+3.3. Aba 2: Historico Clinico e Galeria Fotografica (#tab-historico)
+  - Controles de Filtro: Seletor por paciente especifico e campo de busca livre
+    por procedimento, paciente ou trecho da evolucao clinica.
+  - Grid de Cartoes de Prontuario: Itera sobre a colecao de Procedimentos
+    vinda do Model, exibindo ID do atendimento, datas, status do retorno, dados
+    do paciente, anotacoes clinicas e miniatura da FotoBase64.
+  - Modal de Inspecao Fotografica (#photo-modal): Ao clicar em "Ampliar Foto",
+    exibe a imagem Base64 do Model em alta resolucao sobre fundo escuro.
+
+3.4. Aba 3: Painel de Controle de Retornos (#tab-retornos)
+  - Cartoes de KPIs Gerenciais: Calcula automaticamente a partir do Model:
+      * Atrasados / Urgentes (!RetornoConcluido && DataRetorno < Hoje)
+      * Agendados / Proximos (!RetornoConcluido && DataRetorno >= Hoje)
+      * Retornos Realizados (RetornoConcluido == true)
+  - Filtros Rapidos: Todos, Pendentes/Proximos e Retornos Concluidos.
+  - Tabela Operacional de Retornos: Lista paciente, telefone, procedimento base,
+    datas, cracha de situacao e botao de acao rapida ("Confirmar Presenca" ou
+    "Reabrir Retorno") que dispara POST para /Clinica/AlternarRetorno.
+
+3.5. Aba 4: Auditoria de Dados e Validador SQLite (#tab-sqlite)
+  - Console de Log SQL: Mostra os comandos CREATE, INSERT, UPDATE e PRAGMA
+    executados contra o banco clinica.db.
+  - Inspetor de Tabelas Fisicas: Exibe os registros brutos gravados (ID, FK,
+    datas, tamanho em KB do Base64 e flag RetornoOk) e o tamanho total em disco.
+  - Controles de Verificacao: Botao "Testar Persistencia (Recarregar do Banco)"
+    para comprovar na apresentacao que os dados sobrevivem ao reload, alem de
+    exportacao de backup (.json).
+
+
+================================================================================
+4. COMPONENTE [C] - CONTROLLER (CAMADA DE CONTROLE E ORQUESTRACAO)
+================================================================================
+Arquivo de Referencia: Controllers/ClinicaController.cs
+Injecao de Dependencia: Recebe AppDbContext db via Primary Constructor.
+
+4.1. Action: GET /Clinica/Index
+  - Responsabilidade: Carregar a tela principal com todos os dados atualizados.
+  - Operacao no Model:
+      1. Consulta db.Clientes.ToList() e atribui a ViewBag.Clientes.
+      2. Consulta db.Procedimentos.Include(p => p.Cliente).OrderByDescending(p => p.Id).ToList().
+  - Retorno para a View: Retorna View(historico) populando o Historico e o
+    Painel de Retornos simultaneamente.
+
+4.2. Action: POST /Clinica/CriarCliente(Cliente novo)
+  - Responsabilidade: Cadastrar um novo paciente enviado pela View.
+  - Operacao no Model:
+      1. Recebe o objeto Cliente preenchido via Model Binding do formulario.
+      2. Executa db.Clientes.Add(novo).
+      3. Executa db.SaveChanges() para gravar o INSERT fisico no clinica.db.
+  - Retorno para a View: RedirectToAction("Index") para atualizar a listagem e
+    os seletores de pacientes.
+
+4.3. Action: POST /Clinica/RegistrarProcedimento(Procedimento proc, IFormFile? foto)
+  - Responsabilidade: Salvar um atendimento clinico, converter a foto enviada e
+    programar o retorno do paciente.
+  - Operacao no Model:
+      1. Verifica se "foto" (IFormFile) foi enviada e possui bytes (Length > 0).
+      2. Copia o stream da imagem para um MemoryStream em memoria.
+      3. Converte o array de bytes para string Base64 com prefixo MIME Type
+         ("data:{foto.ContentType};base64,{base64}") e atribui a proc.FotoBase64.
+      4. Executa db.Procedimentos.Add(proc) e db.SaveChanges() no SQLite.
+  - Retorno para a View: RedirectToAction("Index") exibindo o novo atendimento
+    no Historico e na fila do Painel de Retornos.
+
+4.4. Action: POST /Clinica/AlternarRetorno(int id)
+  - Responsabilidade: Confirmar o comparecimento do paciente no retorno (ou
+    reabrir uma pendencia) com um unico clique.
+  - Operacao no Model:
+      1. Busca o registro no banco via db.Procedimentos.Find(id).
+      2. Se encontrado, inverte o estado booleano:
+         proc.RetornoConcluido = !proc.RetornoConcluido.
+      3. Executa db.SaveChanges() para persistir o UPDATE no SQLite.
+  - Retorno para a View: RedirectToAction("Index") recalculando os KPIs e os
+    selos de status na tabela de retornos.
+
+
+================================================================================
+5. MAPEAMENTO DOS 6 REQUISITOS DO ESCOPO NO FLUXO M -> V -> C
+================================================================================
+
+[Requisito 1: Criacao de Cliente]
+  - M: Entidade Cliente (Id, Nome, Telefone, Cpf) na tabela Clientes.
+  - V: Formulario "Novo Cliente" e "Pacientes Cadastrados" na aba Recepcao.
+  - C: Metodo POST CriarCliente(Cliente novo) -> db.Clientes.Add() + SaveChanges().
+
+[Requisito 2: Registro de Procedimento]
+  - M: Entidade Procedimento (ClienteId FK, Tipo, DataProcedimento, DataRetorno,
+       Observacoes) na tabela Procedimentos.
+  - V: Formulario "Registrar Procedimento, Foto e Retorno" na aba Recepcao.
+  - C: Metodo POST RegistrarProcedimento() -> db.Procedimentos.Add() + SaveChanges().
+
+[Requisito 3: Upload de Fotos]
+  - M: Propriedade Procedimento.FotoBase64 armazenada como texto no SQLite.
+  - V: Input de imagem com preview instantaneo no formulario e modal de zoom.
+  - C: Recebe IFormFile? foto em RegistrarProcedimento(), converte via
+       MemoryStream + Convert.ToBase64String() e salva no registro do Model.
+
+[Requisito 4: Listagem de Historico]
+  - M: Consulta relacional Procedimentos.Include(p => p.Cliente) ordenada por Id.
+  - V: Aba "Historico Clinico" com busca textual, filtro por paciente e galeria.
+  - C: Metodo GET Index() que carrega o historico completo e entrega para a View.
+
+[Requisito 5: Visualizacao do Painel de Retornos]
+  - M: Campos DataRetorno e RetornoConcluido na entidade Procedimento.
+  - V: Aba "Painel de Retornos" com 3 KPIs (Atrasados, Agendados, Concluidos),
+       filtros por situacao e botao de acao rapida.
+  - C: Metodo GET Index() (listagem) e POST AlternarRetorno(int id) para dar
+       baixa na presenca do paciente.
+
+[Requisito 6: Persistencia de Dados no Banco (SQLite)]
+  - M: AppDbContext conectado a "Data Source=clinica.db" + EnsureCreated().
+  - V: Aba "Auditoria de Dados" com console de logs SQL, tabela fisica bruta e
+       botao de teste de recarregamento do banco.
+  - C: Chamadas sistematicas a db.SaveChanges() em todas as rotas POST e
+       inicializacao automatica do escopo do banco em Program.cs.
+================================================================================

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClínicaFácil — Gestão de Consultas, Prontuário Fotográfico e Controle de Retornos</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-teal-600 selection:text-white">
+
+  <!-- Top Notification Toast -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- Photo Inspection Modal -->
+  <div id="photo-modal" class="fixed inset-0 z-50 hidden bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div>
+          <h3 id="modal-title" class="font-bold text-slate-900 text-base">Registro Fotográfico Clínico</h3>
+          <p id="modal-subtitle" class="text-xs text-slate-500">Imagem vinculada ao prontuário do paciente</p>
+        </div>
+        <button id="btn-close-modal" type="button" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-5 bg-slate-950 flex items-center justify-center min-h-[260px]">
+        <img id="modal-image" src="" alt="Foto do procedimento" class="max-h-80 max-w-full h-auto rounded-lg object-contain" />
+      </div>
+      <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+        <span id="modal-meta">Arquivo verificado e salvo com segurança no prontuário</span>
+        <button id="btn-close-modal-footer" type="button" class="px-3.5 py-1.5 bg-slate-800 text-white font-medium rounded-lg hover:bg-slate-700 transition">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header / Navbar -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600 to-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg">ClínicaFácil</span>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+              Gestão de Consultórios
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 hidden sm:block">Agendamento Inteligente, Evolução Fotográfica e Fidelização de Pacientes</p>
+        </div>
+      </div>
+
+      <nav class="hidden md:flex items-center gap-1 text-sm font-medium text-slate-600">
+        <a href="#escopo" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">Funcionalidades</a>
+        <a href="#passo-a-passo" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">Como Opera</a>
+        <a href="#sistema-interativo" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">Plataforma ao Vivo</a>
+        <a href="#validador-sqlite" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">Arquitetura Técnica</a>
+        <a href="#codigo-colab" class="px-3 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition">Implementação</a>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Atendimentos: <span id="nav-db-count">0</span></span>
+        </div>
+        <a href="#sistema-interativo" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition">
+          Acessar Painel
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section (Landing Page de Produto) -->
+  <section class="relative overflow-hidden bg-gradient-to-b from-white via-teal-50/30 to-slate-50 pt-8 pb-14 border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+        
+        <!-- Left Column: Product Value Proposition -->
+        <div class="lg:col-span-7 space-y-5">
+          <div class="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-semibold">
+            <span>✨ Plataforma Completa para Clínicas e Consultórios</span>
+            <span class="text-teal-300">|</span>
+            <span>Zero Retornos Perdidos</span>
+          </div>
+
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
+            Organize sua agenda clínica e acompanhe cada paciente com <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-blue-600">Prontuário Visual Completo</span>
+          </h1>
+
+          <p class="text-slate-600 text-base sm:text-lg leading-relaxed max-w-2xl">
+            Centralize o cadastro de clientes, registre procedimentos com fotos de antes e depois, consulte o histórico clínico em segundos e tenha controle total sobre o painel de retornos da sua clínica.
+          </p>
+
+          <!-- Product Benefits Pills -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">Recepção Ágil</span>
+              <span class="font-bold text-slate-800 text-sm">Cadastro em 10s</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">Evolução Visual</span>
+              <span class="font-bold text-teal-700 text-sm">Galeria Antes/Depois</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">Fidelização</span>
+              <span class="font-bold text-amber-700 text-sm">Alerta de Retornos</span>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">Confiabilidade</span>
+              <span class="font-bold text-blue-700 text-sm">Dados 100% Seguros</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-wrap items-center gap-3 pt-2">
+            <a href="#sistema-interativo" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-md shadow-teal-600/20 transition">
+              <span>Experimentar Plataforma Agora</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </a>
+            <a href="#escopo" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-sm transition">
+              <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Conhecer Módulos</span>
+            </a>
+            <a href="#validador-sqlite" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition">
+              <span>Especificações Técnicas</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Right Column: Hero Illustration + Live Clinic Metrics -->
+        <div class="lg:col-span-5">
+          <div class="relative rounded-2xl bg-white p-3 shadow-xl border border-slate-200">
+            <img 
+              id="hero-main-illustration" src="assets/hero-clinica.jpg" 
+              alt="Painel de Gestão Clínica e Agendamento de Pacientes" 
+              class="w-full max-w-full h-auto rounded-xl object-cover border border-slate-100"
+            />
+            <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                <span class="block text-xs text-slate-500">Pacientes Ativos</span>
+                <span id="hero-stat-clientes" class="font-extrabold text-slate-900 text-lg">0</span>
+              </div>
+              <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                <span class="block text-xs text-slate-500">Procedimentos</span>
+                <span id="hero-stat-proc" class="font-extrabold text-teal-700 text-lg">0</span>
+              </div>
+              <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                <span class="block text-xs text-slate-500">Fotos Clínicas</span>
+                <span id="hero-stat-fotos" class="font-extrabold text-blue-700 text-lg">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1: Funcionalidades do Produto -->
+  <section id="escopo" class="py-10 bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-teal-600">Fluxo de Trabalho Integrado</span>
+          <h2 class="text-2xl font-extrabold text-slate-900 mt-1">Tudo o que sua clínica precisa em um único lugar</h2>
+          <p class="text-sm text-slate-600 mt-1">Clique em qualquer recurso abaixo para abrir diretamente a respectiva tela operacional no painel.</p>
+        </div>
+        <button id="btn-popular-demo" type="button" class="self-start md:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold transition">
+          <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span>Restaurar Pacientes de Demonstração</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Feature 1 -->
+        <button type="button" data-goto-tab="tab-cadastro" class="scope-card text-left group p-4 rounded-2xl border border-slate-200 hover:border-teal-500 bg-slate-50/60 hover:bg-white transition shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-teal-100 text-teal-800">1. Criação de Cliente</span>
+            <span id="dor-badge-1" class="text-xs font-semibold text-emerald-600">✓ Ativo</span>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">Recepção descomplicada com ficha rápida de Nome, WhatsApp e CPF, organizando cada paciente com identificador exclusivo.</p>
+        </button>
+
+        <!-- Feature 2 -->
+        <button type="button" data-goto-tab="tab-cadastro" class="scope-card text-left group p-4 rounded-2xl border border-slate-200 hover:border-teal-500 bg-slate-50/60 hover:bg-white transition shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800">2. Registro de Procedimento</span>
+            <span id="dor-badge-2" class="text-xs font-semibold text-emerald-600">✓ Ativo</span>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">Documente o tratamento realizado, anote observações clínicas de evolução e já deixe programada a data ideal de retorno.</p>
+        </button>
+
+        <!-- Feature 3 -->
+        <button type="button" data-goto-tab="tab-cadastro" class="scope-card text-left group p-4 rounded-2xl border border-slate-200 hover:border-teal-500 bg-slate-50/60 hover:bg-white transition shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-purple-100 text-purple-800">3. Upload de Fotos</span>
+            <span id="dor-badge-3" class="text-xs font-semibold text-emerald-600">✓ Ativo</span>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">Anexe fotos clínicas de antes e depois ou exames diretamente no registro do atendimento para acompanhamento visual.</p>
+        </button>
+
+        <!-- Feature 4 -->
+        <button type="button" data-goto-tab="tab-historico" class="scope-card text-left group p-4 rounded-2xl border border-slate-200 hover:border-teal-500 bg-slate-50/60 hover:bg-white transition shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-indigo-100 text-indigo-800">4. Listagem de Histórico</span>
+            <span id="dor-badge-4" class="text-xs font-semibold text-emerald-600">✓ Ativo</span>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">Linha do tempo completa de todos os procedimentos realizados, com busca rápida por paciente e zoom nas fotos anexadas.</p>
+        </button>
+
+        <!-- Feature 5 -->
+        <button type="button" data-goto-tab="tab-retornos" class="scope-card text-left group p-4 rounded-2xl border border-slate-200 hover:border-teal-500 bg-slate-50/60 hover:bg-white transition shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-100 text-amber-900">5. Painel de Retornos</span>
+            <span id="dor-badge-5" class="text-xs font-semibold text-emerald-600">✓ Ativo</span>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">Visão gerencial de retornos pendentes, atrasados e concluídos para sua recepção confirmar presenças com um único clique.</p>
+        </button>
+
+        <!-- Feature 6 -->
+        <button type="button" data-goto-tab="tab-sqlite" class="scope-card text-left group p-4 rounded-2xl border border-slate-200 hover:border-teal-500 bg-slate-50/60 hover:bg-white transition shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-800">6. Auditoria & Segurança</span>
+            <span id="dor-badge-6" class="text-xs font-semibold text-emerald-600">✓ Verificado</span>
+          </div>
+          <p class="text-xs text-slate-600 leading-relaxed">Garantia de guarda permanente dos prontuários com verificação de integridade, backup imediato e histórico de gravação.</p>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1.5: Explicação Textual do Passo a Passo de Operação da Página -->
+  <section id="passo-a-passo" class="py-12 bg-slate-50 border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-3xl mb-8">
+        <span class="text-xs font-bold uppercase tracking-wider text-teal-600">Guia de Operação do Produto</span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">Passo a passo de como a página opera</h2>
+        <p class="text-sm sm:text-base text-slate-600 mt-2 leading-relaxed">
+          A página funciona como uma estação de trabalho clínica completa e interativa. Todas as ações realizadas nos formulários atualizam instantaneamente os indicadores do topo, os seletores de pacientes, a galeria de histórico e o painel de retornos, mantendo os dados salvos de forma permanente. Veja abaixo como operar cada etapa:
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-200">
+        
+        <!-- Passo 1 -->
+        <div class="p-6 sm:p-7 flex flex-col md:flex-row gap-4 sm:gap-6 items-start">
+          <div class="w-10 h-10 rounded-xl bg-teal-600 text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
+            1
+          </div>
+          <div class="space-y-2 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Recepção e Criação do Cliente</h3>
+              <button type="button" data-goto-tab="tab-cadastro" class="scope-card text-xs font-semibold text-teal-700 hover:text-teal-800 underline">
+                Abrir na aba Recepção &rarr;
+              </button>
+            </div>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              O fluxo começa na coluna esquerda da aba <strong>Recepção &amp; Atendimento</strong>. Ao preencher o nome completo, o telefone/WhatsApp e o CPF do paciente e clicar em <em>"Cadastrar Cliente"</em>, a página valida os campos obrigatórios, atribui automaticamente um número de identificação único ao paciente e o adiciona imediatamente à lista de <strong>Pacientes Cadastrados</strong>. No mesmo instante, o seletor de pacientes do formulário de procedimentos ao lado é atualizado e já seleciona o novo cliente automaticamente para agilizar o atendimento.
+            </p>
+          </div>
+        </div>
+
+        <!-- Passo 2 -->
+        <div class="p-6 sm:p-7 flex flex-col md:flex-row gap-4 sm:gap-6 items-start">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
+            2
+          </div>
+          <div class="space-y-2 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Registro do Procedimento e Agendamento do Retorno</h3>
+              <button type="button" data-goto-tab="tab-cadastro" class="scope-card text-xs font-semibold text-blue-700 hover:text-blue-800 underline">
+                Ir para o formulário clínico &rarr;
+              </button>
+            </div>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Na coluna direita da mesma aba, o profissional seleciona o paciente atendido, escolhe a categoria do procedimento realizado (como limpeza, clareamento, aplicação estética ou pós-operatório) e define duas datas fundamentais: a <strong>Data do Atendimento</strong> e a <strong>Data Prevista para Retorno</strong>. Em seguida, descreve a evolução clínica e as recomendações no campo de observações. Essas informações alimentarão simultaneamente o prontuário histórico e a fila de retornos da recepção.
+            </p>
+          </div>
+        </div>
+
+        <!-- Passo 3 -->
+        <div class="p-6 sm:p-7 flex flex-col md:flex-row gap-4 sm:gap-6 items-start">
+          <div class="w-10 h-10 rounded-xl bg-purple-600 text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
+            3
+          </div>
+          <div class="space-y-2 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Upload e Pré-visualização de Fotografias Clínicas</h3>
+              <button type="button" data-goto-tab="tab-cadastro" class="scope-card text-xs font-semibold text-purple-700 hover:text-purple-800 underline">
+                Testar anexo de fotos &rarr;
+              </button>
+            </div>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Antes de finalizar o registro do atendimento, a área pontilhada permite anexar uma fotografia clínica de antes/depois ou exame de imagem. O usuário pode clicar em <em>"Enviar Foto..."</em> para escolher um arquivo real do seu computador ou celular, ou clicar em <em>"Gerar Foto Clínica de Exemplo"</em> para criar instantaneamente uma imagem clínica ilustrativa. A página processa o arquivo na hora, exibe uma miniatura de confirmação e, ao clicar em <em>"Salvar Procedimento e Agendar Retorno"</em>, vincula a imagem permanentemente ao prontuário daquele paciente.
+            </p>
+          </div>
+        </div>
+
+        <!-- Passo 4 -->
+        <div class="p-6 sm:p-7 flex flex-col md:flex-row gap-4 sm:gap-6 items-start">
+          <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
+            4
+          </div>
+          <div class="space-y-2 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Consulta e Filtragem na Listagem de Histórico</h3>
+              <button type="button" data-goto-tab="tab-historico" class="scope-card text-xs font-semibold text-indigo-700 hover:text-indigo-800 underline">
+                Explorar Histórico Clínico &rarr;
+              </button>
+            </div>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Ao alternar para a aba <strong>Histórico Clínico</strong>, a página apresenta todos os atendimentos registrados em cartões organizados do mais recente para o mais antigo. O profissional pode filtrar a listagem selecionando um paciente específico ou digitando qualquer palavra-chave no campo de busca (como o nome do procedimento ou um trecho da observação clínica). Cada cartão exibe a miniatura da foto anexada e conta com o botão <em>"Ampliar Foto"</em>, que abre uma janela de inspeção em alta resolução para análise detalhada da evolução do tratamento.
+            </p>
+          </div>
+        </div>
+
+        <!-- Passo 5 -->
+        <div class="p-6 sm:p-7 flex flex-col md:flex-row gap-4 sm:gap-6 items-start">
+          <div class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
+            5
+          </div>
+          <div class="space-y-2 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Gestão e Confirmação no Painel de Retornos</h3>
+              <button type="button" data-goto-tab="tab-retornos" class="scope-card text-xs font-semibold text-amber-700 hover:text-amber-800 underline">
+                Acessar Painel de Retornos &rarr;
+              </button>
+            </div>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Na aba <strong>Painel de Retornos</strong>, a página cruza automaticamente a data prevista de retorno de cada atendimento com a data atual para classificar os pacientes em três indicadores gerenciais: <strong>Atrasados / Urgentes</strong> (quando a data prevista já passou e o paciente ainda não compareceu), <strong>Agendados / Próximos</strong> e <strong>Retornos Realizados</strong>. A equipe de recepção pode filtrar a tabela por status, visualizar o telefone de contato do paciente e clicar no botão <em>"Confirmar Presença"</em> assim que o retorno acontecer, atualizando imediatamente todos os painéis da clínica.
+            </p>
+          </div>
+        </div>
+
+        <!-- Passo 6 -->
+        <div class="p-6 sm:p-7 flex flex-col md:flex-row gap-4 sm:gap-6 items-start">
+          <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
+            6
+          </div>
+          <div class="space-y-2 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-base sm:text-lg font-bold text-slate-900">Auditoria e Validação de Persistência dos Dados</h3>
+              <button type="button" data-goto-tab="tab-sqlite" class="scope-card text-xs font-semibold text-emerald-700 hover:text-emerald-800 underline">
+                Ver Auditoria de Dados &rarr;
+              </button>
+            </div>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Por fim, a aba <strong>Auditoria de Dados</strong> comprova que nenhuma informação se perde entre sessões. Sempre que um cliente é criado, um procedimento com foto é registrado ou um retorno é confirmado, a operação é gravada de forma durável e registrada no painel de auditoria. Ao clicar em <em>"Testar Persistência (Recarregar do Banco)"</em>, a página limpa a memória temporária da tela e reconstrói todos os prontuários diretamente a partir do armazenamento físico, exibindo um selo de verificação de integridade. Nessa mesma tela também é possível exportar um backup completo ou restaurar os dados de demonstração.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: Interactive Live System (Product Workspace) -->
+  <section id="sistema-interativo" class="py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- App Window Header -->
+      <div class="bg-slate-900 text-white rounded-t-2xl px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+            <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+          </div>
+          <span class="text-xs sm:text-sm font-medium text-slate-300">ClínicaFácil • Ambiente Operacional de Atendimento</span>
+        </div>
+
+        <!-- Module Navigation Tabs -->
+        <div class="flex flex-wrap items-center gap-1.5" role="tablist">
+          <button type="button" data-tab="tab-cadastro" class="app-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-white transition">
+            Recepção & Atendimento
+          </button>
+          <button type="button" data-tab="tab-historico" class="app-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+            Histórico Clínico (<span id="tab-badge-hist">0</span>)
+          </button>
+          <button type="button" data-tab="tab-retornos" class="app-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+            Painel de Retornos (<span id="tab-badge-ret">0</span>)
+          </button>
+          <button type="button" data-tab="tab-sqlite" class="app-tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-emerald-400 hover:bg-slate-700 transition border border-emerald-500/30">
+            Auditoria de Dados
+          </button>
+        </div>
+      </div>
+
+      <!-- Main App Workspace Container -->
+      <div class="bg-white rounded-b-2xl shadow-lg border-x border-b border-slate-200 p-4 sm:p-6 lg:p-8">
+
+        <!-- TAB 1: CRIAÇÃO DE CLIENTE + REGISTRO DE PROCEDIMENTO + UPLOAD DE FOTOS -->
+        <div id="tab-cadastro" class="app-tab-panel grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          <!-- Left Form: 1. Criação de Cliente -->
+          <div class="lg:col-span-5 bg-slate-50 rounded-2xl p-5 border border-slate-200 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-teal-100 text-teal-800">Recepção</span>
+                <span class="text-xs font-medium text-slate-400">Ficha do Paciente</span>
+              </div>
+              <h3 class="text-lg font-bold text-slate-900">Novo Cliente</h3>
+              <p class="text-xs text-slate-500 mt-1 mb-5">Cadastre rapidamente o paciente para liberar o agendamento de consultas e procedimentos.</p>
+
+              <form id="form-cliente" class="space-y-4">
+                <div>
+                  <label for="input-cliente-nome" class="block text-xs font-semibold text-slate-700 mb-1">Nome Completo do Paciente *</label>
+                  <input id="input-cliente-nome" type="text" required placeholder="Ex: Mariana Costa" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white" />
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label for="input-cliente-tel" class="block text-xs font-semibold text-slate-700 mb-1">Telefone / WhatsApp *</label>
+                    <input id="input-cliente-tel" type="text" required placeholder="(11) 99876-5432" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white" />
+                  </div>
+                  <div>
+                    <label for="input-cliente-cpf" class="block text-xs font-semibold text-slate-700 mb-1">CPF / Documento</label>
+                    <input id="input-cliente-cpf" type="text" placeholder="123.456.789-00" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white" />
+                  </div>
+                </div>
+
+                <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-sm transition flex items-center justify-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                  <span>Cadastrar Cliente</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Mini Lista de Clientes Cadastrados -->
+            <div class="mt-6 pt-5 border-t border-slate-200">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Pacientes Cadastrados (<span id="count-clientes-mini">0</span>)</span>
+                <span class="text-[11px] text-emerald-700 font-medium">Cadastro Ativo</span>
+              </div>
+              <div id="lista-clientes-mini" class="space-y-1.5 max-h-44 overflow-y-auto pr-1"></div>
+            </div>
+          </div>
+
+          <!-- Right Form: 2. Registro de Procedimento + 3. Upload de Fotos -->
+          <div class="lg:col-span-7 bg-slate-50 rounded-2xl p-5 border border-slate-200">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-800">Consultório</span>
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-purple-100 text-purple-800">Anexo Fotográfico</span>
+              </div>
+              <span class="text-xs font-medium text-slate-400">Prontuário Digital</span>
+            </div>
+
+            <h3 class="text-lg font-bold text-slate-900">Registrar Procedimento, Foto e Retorno</h3>
+            <p class="text-xs text-slate-500 mt-1 mb-5">Documente o atendimento realizado, anexe a fotografia clínica de acompanhamento e programe a data de retorno.</p>
+
+            <form id="form-procedimento" class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="select-proc-cliente" class="block text-xs font-semibold text-slate-700 mb-1">Selecionar Paciente *</label>
+                  <select id="select-proc-cliente" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"></select>
+                </div>
+
+                <div>
+                  <label for="select-proc-tipo" class="block text-xs font-semibold text-slate-700 mb-1">Procedimento Realizado *</label>
+                  <select id="select-proc-tipo" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                    <option value="Avaliação Inicial & Check-up">Avaliação Inicial & Check-up</option>
+                    <option value="Limpeza e Profilaxia Dental">Limpeza e Profilaxia Dental</option>
+                    <option value="Clareamento a Laser (Sessão 1)">Clareamento a Laser (Sessão 1)</option>
+                    <option value="Aplicação de Toxina Botulínica">Aplicação de Toxina Botulínica</option>
+                    <option value="Manutenção Ortodôntica">Manutenção Ortodôntica</option>
+                    <option value="Pós-Operatório / Retirada de Pontos">Pós-Operatório / Retirada de Pontos</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="input-proc-data" class="block text-xs font-semibold text-slate-700 mb-1">Data do Atendimento *</label>
+                  <input id="input-proc-data" type="date" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                </div>
+
+                <div>
+                  <label for="input-proc-retorno" class="block text-xs font-semibold text-slate-700 mb-1">Data Prevista para Retorno *</label>
+                  <input id="input-proc-retorno" type="date" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                </div>
+              </div>
+
+              <div>
+                <label for="input-proc-obs" class="block text-xs font-semibold text-slate-700 mb-1">Observações Clínicas / Evolução *</label>
+                <textarea id="input-proc-obs" rows="2" required placeholder="Ex: Procedimento sem intercorrências. Paciente orientado a retornar para revisão fotográfica." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"></textarea>
+              </div>
+
+              <!-- Upload de Fotos Area -->
+              <div class="bg-white p-4 rounded-xl border border-dashed border-purple-300">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div>
+                    <span class="text-xs font-bold text-purple-900 block">Fotografia do Procedimento (Antes / Depois / Exame)</span>
+                    <span class="text-[11px] text-slate-500">Envie uma foto do seu dispositivo ou gere uma imagem clínica simulada para testar o fluxo.</span>
+                  </div>
+                  <button id="btn-gerar-foto-demo" type="button" class="shrink-0 px-3 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 font-semibold text-xs transition">
+                    ✨ Gerar Foto Clínica de Exemplo
+                  </button>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <label class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>Enviar Foto...</span>
+                    <input id="input-proc-foto" type="file" accept="image/*" class="hidden" />
+                  </label>
+
+                  <div id="foto-preview-wrapper" class="flex items-center gap-3">
+                    <img id="img-upload-preview" src="" alt="Preview" class="hidden w-14 h-14 rounded-lg object-cover border border-purple-200 shadow-sm" />
+                    <span id="foto-status-text" class="text-xs text-slate-500">Nenhuma foto selecionada (um cartão visual clínico será anexado automaticamente).</span>
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" class="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-sm transition flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Salvar Procedimento e Agendar Retorno</span>
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+        <!-- TAB 2: LISTAGEM DE HISTÓRICO -->
+        <div id="tab-historico" class="app-tab-panel hidden space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-indigo-100 text-indigo-800">Prontuário Eletrônico</span>
+              <h3 class="text-xl font-bold text-slate-900 mt-1">Histórico de Procedimentos e Galeria Clínica</h3>
+              <p class="text-xs text-slate-500">Consulte todos os atendimentos realizados, filtre por paciente e amplie as fotografias clínicas.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <select id="filtro-historico-cliente" class="px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white font-medium text-slate-700">
+                <option value="TODOS">Todos os Pacientes</option>
+              </select>
+              <input id="filtro-historico-busca" type="text" placeholder="Buscar procedimento ou anotação..." class="px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white" />
+            </div>
+          </div>
+
+          <div id="historico-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- TAB 3: VISUALIZAÇÃO DO PAINEL DE RETORNOS -->
+        <div id="tab-retornos" class="app-tab-panel hidden space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-100 text-amber-900">Agenda de Fidelização</span>
+              <h3 class="text-xl font-bold text-slate-900 mt-1">Painel de Controle de Retornos</h3>
+              <p class="text-xs text-slate-500">Monitore os pacientes que precisam retornar para revisão pós-procedimento ou continuidade do tratamento.</p>
+            </div>
+
+            <!-- Filtro de Status de Retorno -->
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button type="button" data-ret-filter="TODOS" class="ret-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white">Todos</button>
+              <button type="button" data-ret-filter="PENDENTE" class="ret-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">Pendentes / Próximos</button>
+              <button type="button" data-ret-filter="CONCLUIDO" class="ret-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">Retornos Concluídos</button>
+            </div>
+          </div>
+
+          <!-- KPI Summary Row -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="p-4 rounded-xl bg-rose-50 border border-rose-200">
+              <span class="text-xs font-semibold text-rose-700 uppercase">Atrasados / Urgentes</span>
+              <p id="kpi-ret-atrasados" class="text-2xl font-extrabold text-rose-900 mt-1">0</p>
+              <span class="text-[11px] text-rose-600">Data prevista anterior a hoje</span>
+            </div>
+            <div class="p-4 rounded-xl bg-amber-50 border border-amber-200">
+              <span class="text-xs font-semibold text-amber-800 uppercase">Agendados / Próximos</span>
+              <p id="kpi-ret-agendados" class="text-2xl font-extrabold text-amber-900 mt-1">0</p>
+              <span class="text-[11px] text-amber-700">Aguardando data de retorno</span>
+            </div>
+            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+              <span class="text-xs font-semibold text-emerald-800 uppercase">Retornos Realizados</span>
+              <p id="kpi-ret-concluidos" class="text-2xl font-extrabold text-emerald-900 mt-1">0</p>
+              <span class="text-[11px] text-emerald-700">Comparecimento confirmado</span>
+            </div>
+          </div>
+
+          <!-- Table of Returns -->
+          <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-100 text-slate-600 text-xs uppercase border-b border-slate-200">
+                  <th class="py-3 px-4 font-bold">Paciente</th>
+                  <th class="py-3 px-4 font-bold">Procedimento Base</th>
+                  <th class="py-3 px-4 font-bold">Data Atendimento</th>
+                  <th class="py-3 px-4 font-bold">Previsão Retorno</th>
+                  <th class="py-3 px-4 font-bold">Situação</th>
+                  <th class="py-3 px-4 font-bold text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-retornos-body" class="divide-y divide-slate-200 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 4: AUDITORIA E VALIDAÇÃO DE PERSISTÊNCIA (SESSÃO TÉCNICA INTEGRADA) -->
+        <div id="tab-sqlite" class="app-tab-panel hidden space-y-6">
+          <div class="bg-emerald-950 text-emerald-50 rounded-2xl p-5 border border-emerald-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-800/80 text-emerald-200 text-xs font-semibold">
+                <span>Painel de Auditoria Técnica • Persistência SQLite</span>
+              </div>
+              <h3 class="text-xl font-bold text-white">Validador de Persistência de Dados no Banco</h3>
+              <p class="text-xs text-emerald-200/90 max-w-2xl">
+                Verifique em tempo real que todos os clientes, procedimentos, fotos e retornos permanecem gravados de forma durável no banco de dados e sobrevivem ao recarregamento da aplicação.
+              </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button id="btn-simular-reload" type="button" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Testar Persistência (Recarregar do Banco)</span>
+              </button>
+              <button id="btn-exportar-json" type="button" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 font-semibold text-xs border border-emerald-700 transition">
+                Exportar Backup (.json)
+              </button>
+              <button id="btn-limpar-banco" type="button" class="px-3.5 py-2.5 rounded-xl bg-rose-900/60 hover:bg-rose-800 text-rose-200 font-semibold text-xs border border-rose-700/50 transition">
+                Limpar Registros
+              </button>
+            </div>
+          </div>
+
+          <!-- Persistence Verification Banner -->
+          <div id="persistence-check-banner" class="hidden p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs sm:text-sm flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">✓</span>
+              <div>
+                <p class="font-bold">Persistência de Dados Validada com Sucesso!</p>
+                <p id="persistence-check-details" class="text-xs text-emerald-700">Memória temporária reiniciada e recarregada a partir do armazenamento físico. Todos os prontuários permanecem intactos.</p>
+              </div>
+            </div>
+            <span class="font-mono-code text-xs bg-emerald-100 px-2.5 py-1 rounded border border-emerald-300">INTEGRITY_CHECK: OK</span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- SQL Transaction Log -->
+            <div class="lg:col-span-5 bg-slate-900 rounded-2xl p-4 border border-slate-800 flex flex-col h-80">
+              <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                <span class="text-xs font-mono-code font-bold text-emerald-400">sqlite3&gt; Histórico de Gravação no Banco</span>
+                <span class="text-[11px] font-mono-code text-slate-400">clinica.db</span>
+              </div>
+              <div id="sql-log-console" class="font-mono-code text-xs text-slate-300 space-y-2 overflow-y-auto flex-1 pr-1"></div>
+            </div>
+
+            <!-- Raw SQLite Tables Inspector -->
+            <div class="lg:col-span-7 bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col h-80 overflow-hidden">
+              <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-200">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Registros Gravados nas Tabelas (`Clientes` + `Procedimentos`)</span>
+                <span id="sqlite-byte-size" class="text-xs font-mono-code text-teal-700 font-semibold">0 KB</span>
+              </div>
+              <div class="overflow-auto flex-1">
+                <table class="w-full text-left border-collapse text-xs font-mono-code">
+                  <thead>
+                    <tr class="bg-slate-200/80 text-slate-700">
+                      <th class="p-2">ID</th>
+                      <th class="p-2">ClienteId (FK)</th>
+                      <th class="p-2">Procedimento</th>
+                      <th class="p-2">DataConsulta</th>
+                      <th class="p-2">DataRetorno</th>
+                      <th class="p-2">Foto (Base64)</th>
+                      <th class="p-2">RetornoOk</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sqlite-raw-tbody" class="divide-y divide-slate-200 bg-white"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Especificações Técnicas & Arquitetura do Projeto (Sessão Técnica) -->
+  <section id="validador-sqlite" class="py-10 bg-slate-100 border-t border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div class="lg:col-span-5 space-y-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Sessão Técnica • Arquitetura & Engenharia</span>
+          <h2 class="text-2xl font-extrabold text-slate-900">Arquitetura Enxuta e de Fácil Manutenção</h2>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Nos bastidores, o produto foi projetado com código limpo e mínimo em <strong>C# ASP.NET Core MVC</strong> integrado ao banco <strong>SQLite</strong>, permitindo execução imediata em nuvem via <strong>Google Colab</strong> para apresentações e demonstrações:
+          </p>
+          <ul class="space-y-2 text-xs sm:text-sm text-slate-700 pt-2">
+            <li class="flex items-start gap-2">
+              <span class="text-teal-600 font-bold">1.</span>
+              <span><strong>Banco Relacional Portátil (`clinica.db`):</strong> Persistência SQLite em arquivo único, sem necessidade de configurar servidores pesados de banco de dados.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-teal-600 font-bold">2.</span>
+              <span><strong>Armazenamento Direto de Fotos:</strong> Conversão direta do upload (`IFormFile`) para Base64 no banco, eliminando dependências externas de storage.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-teal-600 font-bold">3.</span>
+              <span><strong>Estrutura MVC Direta:</strong> Apenas 1 Controller principal (`ClinicaController.cs`) e modelos enxutos para facilitar a leitura e manutenção pela equipe.</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Visual Flow Diagram -->
+        <div class="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 font-bold flex items-center justify-center mb-3 text-sm">1</div>
+            <h3 class="font-bold text-slate-900 text-sm">Ambiente Google Colab</h3>
+            <p class="text-xs text-slate-500 mt-1">Executa o SDK do .NET 8 no notebook e disponibiliza link público externo via túnel HTTP para demonstração ao vivo.</p>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 font-bold flex items-center justify-center mb-3 text-sm">2</div>
+            <h3 class="font-bold text-slate-900 text-sm">Servidor ASP.NET MVC</h3>
+            <p class="text-xs text-slate-500 mt-1">Centraliza as rotas de criação de cliente, registro de procedimento com foto e atualização do painel de retornos.</p>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="w-9 h-9 rounded-xl bg-teal-100 text-teal-800 font-bold flex items-center justify-center mb-3 text-sm">3</div>
+            <h3 class="font-bold text-slate-900 text-sm">Persistência SQLite</h3>
+            <p class="text-xs text-slate-500 mt-1">Inicialização automática com `EnsureCreated()`, garantindo tabelas prontas e dados preservados no disco.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: Implementação Técnica (Código C# MVC + Colab) -->
+  <section id="codigo-colab" class="py-12 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-teal-600">Sessão Técnica • Repositório de Implementação</span>
+          <h2 class="text-2xl font-extrabold text-slate-900 mt-1">Código-Fonte do Servidor e Script de Execução</h2>
+          <p class="text-sm text-slate-600 mt-1">Consulte e copie os arquivos enxutos de back-end para rodar o servidor no Google Colab durante a apresentação.</p>
+        </div>
+
+        <button id="btn-copiar-codigo" type="button" class="self-start md:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-sm">
+          <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          <span id="copy-btn-label">Copiar Aba Selecionada</span>
+        </button>
+      </div>
+
+      <!-- Code Tabs -->
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button type="button" data-code-tab="colab" class="code-tab-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-600 text-white transition">
+          1. Script Google Colab (Setup + Run)
+        </button>
+        <button type="button" data-code-tab="models" class="code-tab-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          2. Models + AppDbContext.cs (SQLite)
+        </button>
+        <button type="button" data-code-tab="controller" class="code-tab-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          3. ClinicaController.cs (Rotas MVC)
+        </button>
+        <button type="button" data-code-tab="program" class="code-tab-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          4. Program.cs (Inicialização)
+        </button>
+      </div>
+
+      <!-- Code Previews -->
+      <div class="bg-slate-950 text-slate-100 rounded-2xl p-5 border border-slate-800 overflow-x-auto">
+        <pre id="code-display" class="font-mono-code text-xs leading-relaxed"></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800 text-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <span class="font-bold text-white">ClínicaFácil</span> — Plataforma de Agendamento, Prontuário Fotográfico e Gestão de Retornos
+      </div>
+      <div class="flex items-center gap-4">
+        <span>Pacientes • Procedimentos • Galeria Clínica • Histórico • Painel de Retornos</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

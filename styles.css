@@ -1,0 +1,36 @@
+/* ==========================================================================
+   ClínicaFácil — Folha de Estilos Principal (styles.css)
+   Stack: HTML5 + Tailwind CSS + JavaScript (Simulador MVC + Persistência SQLite)
+   ========================================================================== */
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.font-mono-code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.glass-badge {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Custom Scrollbar para logs SQL e blocos de código */
+#sql-log-console::-webkit-scrollbar,
+#code-display::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+#sql-log-console::-webkit-scrollbar-track,
+#code-display::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+#sql-log-console::-webkit-scrollbar-thumb,
+#code-display::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
